@@ -13,7 +13,7 @@ export const signup = async (req: any, res: any) => {
       where: { username },
     });
     if (existingUser) {
-      return res.status(400).json({ message: "Username already exists." });
+      return res.status(400).json({ message: "Username already exists" });
     }
     const hashedPassword = await bcrypt.hash(password, 10);
     const newUser = await prisma.user.create({
@@ -22,10 +22,10 @@ export const signup = async (req: any, res: any) => {
         password: hashedPassword,
       },
     });
-    return res.status(201).json({ message: "User created successfully." });
+    return res.status(201).json({ message: "User created successfully" });
   } catch (error) {
     console.error("Error during signup:", error);
-    return res.status(500).json({ message: "Internal server error." });
+    return res.status(500).json({ message: "Error creating user" });
   }
 };
 
@@ -40,11 +40,11 @@ export const login = async (req: any, res: any) => {
       where: { username },
     });
     if (!user) {
-      return res.status(400).json({ message: "Invalid username or password." });
+      return res.status(400).json({ message: "Invalid username or password" });
     }
     const passwordMatch = await bcrypt.compare(password, user.password);
     if (!passwordMatch) {
-      return res.status(400).json({ message: "Invalid username or password." });
+      return res.status(400).json({ message: "Invalid username or password" });
     }
     const token = generateToken(user.id);
     res.cookie("token", token, {
@@ -52,9 +52,9 @@ export const login = async (req: any, res: any) => {
       sameSite: "strict",
       maxAge: 90 * 24 * 60 * 60 * 1000, // 90 days
     });
-    return res.status(200).json({ message: "Login successful." });
+    return res.status(200).json({ message: "Login successful" });
   } catch (error) {
     console.error("Error during login:", error);
-    return res.status(500).json({ message: "Internal server error." });
+    return res.status(500).json({ message: "Error logging in" });
   }
 };

@@ -27,6 +27,7 @@ model User {
 
 model Game {
   id      Int    @id @default(autoincrement())
+  name    String
   status  Status @default(PENDING)
   players User[]
 }
