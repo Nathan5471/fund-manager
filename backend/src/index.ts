@@ -5,6 +5,7 @@ import dotenv from "dotenv";
 import cookieParser from "cookie-parser";
 import authRouter from "./routes/authRouter";
 import gameRouter from "./routes/gameRouter";
+import gameSocket from "./socket/gameSocket";
 
 dotenv.config();
 
@@ -20,6 +21,7 @@ app.use(cookieParser());
 
 app.use("/api/auth", authRouter);
 app.use("/api/game", gameRouter);
+gameSocket(io);
 
 server.listen(3000, () => {
   console.log;

@@ -9,14 +9,6 @@ export const createGame = async (req: any, res: any) => {
         name,
       },
     });
-    await prisma.game.update({
-      where: { id: game.id },
-      data: {
-        players: {
-          connect: { id: req.user.id },
-        },
-      },
-    });
     return res
       .status(201)
       .json({ message: "Game created successfully", id: game.id });
@@ -32,6 +24,7 @@ export const joinGame = async (gameId: number, userId: string) => {
   try {
     const game = await prisma.game.findUnique({
       where: { id: gameId },
+      include: { players: true },
     });
     if (!game) {
       throw new Error("Game not found");
@@ -45,14 +38,28 @@ export const joinGame = async (gameId: number, userId: string) => {
     if (!user) {
       throw new Error("User not found");
     }
-    await prisma.game.update({
+    if (game.players.some((player) => player.id === userId)) {
+      throw new Error("User is already part of the game");
+    }
+    const updatedGame = await prisma.game.update({
       where: { id: gameId },
       data: {
         players: {
           connect: { id: userId },
         },
       },
+      include: { players: true },
     });
+    const returnedGame = {
+      id: updatedGame.id,
+      name: updatedGame.name,
+      status: updatedGame.status,
+      players: updatedGame.players.map((player) => ({
+        id: player.id,
+        username: player.username,
+      })),
+    };
+    return returnedGame;
   } catch (error) {
     console.error("Error joining game:", error);
     throw new Error("An error occurred while joining the game");
@@ -84,15 +91,27 @@ export const leaveGame = async (gameId: number, userId: string) => {
       await prisma.game.delete({
         where: { id: gameId },
       });
+      return null;
     } else {
-      await prisma.game.update({
+      const updatedGame = await prisma.game.update({
         where: { id: gameId },
         data: {
           players: {
             disconnect: { id: userId },
           },
         },
+        include: { players: true },
       });
+      const returnedGame = {
+        id: updatedGame.id,
+        name: updatedGame.name,
+        status: updatedGame.status,
+        players: updatedGame.players.map((player) => ({
+          id: player.id,
+          username: player.username,
+        })),
+      };
+      return returnedGame;
     }
   } catch (error) {
     console.error("Error leaving game:", error);
@@ -111,10 +130,21 @@ export const changeGameStatus = async (
     if (!game) {
       throw new Error("Game not found");
     }
-    await prisma.game.update({
+    const updatedGame = await prisma.game.update({
       where: { id: gameId },
       data: { status },
+      include: { players: true },
     });
+    const returnedGame = {
+      id: updatedGame.id,
+      name: updatedGame.name,
+      status: updatedGame.status,
+      players: updatedGame.players.map((player) => ({
+        id: player.id,
+        username: player.username,
+      })),
+    };
+    return returnedGame;
   } catch (error) {
     console.error("Error changing game status:", error);
     throw new Error("An error occurred while changing the game status");
@@ -123,10 +153,16 @@ export const changeGameStatus = async (
 
 export const getAllGames = async (req: any, res: any) => {
   try {
-    const games = await prisma.game.findMany();
+    const games = await prisma.game.findMany({ include: { players: true } });
+    const returnedGames = games.map((game) => ({
+      id: game.id,
+      name: game.name,
+      status: game.status,
+      players: game.players.length,
+    }));
     return res
       .status(200)
-      .json({ message: "Games fetched successfully", games });
+      .json({ message: "Games fetched successfully", games: returnedGames });
   } catch (error) {
     console.error("Error fetching games:", error);
     return res
