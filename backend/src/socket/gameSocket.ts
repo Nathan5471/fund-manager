@@ -13,12 +13,74 @@ import { Game, ActiveGame } from "../gameTypes";
 const games = new Map<number, Game>();
 const activeGames = new Map<number, ActiveGame>();
 
-cron.schedule("*/5 * * * * *", () => {
-  // Simulates a day
-  activeGames.forEach((game, gameId) => {});
-});
-
 const gameSocket = (io: Server) => {
+  cron.schedule("*/5 * * * * *", () => {
+    // Simulates a day
+    activeGames.forEach((game, gameId) => {
+      game.currentDay += 1;
+      if (game.currentDay > 365) {
+        game.status = "COMPLETED";
+        const updatedGame = games.get(gameId);
+        if (updatedGame) {
+          updatedGame.status = "COMPLETED";
+          games.set(gameId, updatedGame);
+        }
+        io.to(`game_${gameId}`).emit("gameCompleted", game);
+      } else {
+        if (Math.random() < 0.05) {
+          // 5% chance of a random event
+          const events = [
+            "Market Surge",
+            "Market Crash",
+            "Tech Surge",
+            "Tech Crash",
+            "Retail Surge",
+            "Retail Crash",
+            "Finance Surge",
+            "Finance Crash",
+            "Healthcare Surge",
+            "Healthcare Crash",
+            "Energy Surge",
+            "Energy Crash",
+          ];
+          const event = events[Math.floor(Math.random() * events.length)];
+          game.currentEvents.push(event);
+        }
+        for (const stock of game.stocks) {
+          const eventImpact = game.currentEvents.reduce((acc, event) => {
+            if (
+              event.split(" ")[0] === stock.industry ||
+              event.split(" ")[0] === "Market"
+            ) {
+              return acc + (event.split(" ")[1] === "Surge" ? 0.1 : -0.1);
+            }
+            return acc;
+          }, 0);
+          const stockChange =
+            1 +
+            game.marketRate +
+            eventImpact +
+            stock.volatility * (Math.random() - 0.5) +
+            stock.baseChange;
+          stock.price *= stockChange;
+          stock.priceHistory.set(game.currentDay, stock.price);
+          for (const [playerId, owner] of stock.owners) {
+            const player = game.players.find((p) => p.id === playerId);
+            if (player) {
+              const stockValue = owner.currentValue * stockChange;
+              player.totalValue += stockValue - owner.currentValue;
+              owner.currentValue = stockValue;
+            }
+          }
+        }
+        for (const player of game.players) {
+          player.totalValueHistory.set(game.currentDay, player.totalValue);
+        }
+        io.to(`game_${gameId}`).emit("gameUpdated", game);
+      }
+    });
+  });
+
   io.use(async (socket, next) => {
     try {
       const cookies = socket.handshake.headers.cookie;

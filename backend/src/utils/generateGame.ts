@@ -17,9 +17,11 @@ const generateGame = (game: Game) => {
       fundName: `${user.username}'s Fund`,
       cash: 1000,
       totalValue: 1000,
+      totalValueHistory: new Map<number, number>(),
       ownedStocks: [],
       investors: new Map<string, number>(),
     };
+    player.totalValueHistory.set(0, player.totalValue);
     newGame.players.push(player);
   }
   for (let i = 0; i < 75; i++) {
