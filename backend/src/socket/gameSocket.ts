@@ -1,25 +1,22 @@
 import { Server } from "socket.io";
 import { parse } from "cookie";
+import cron from "node-cron";
 import authenticate from "../utils/authenticate";
 import {
   joinGame,
   leaveGame,
   changeGameStatus,
 } from "../controllers/gameController";
-
-interface User {
-  id: string;
-  username: string;
-}
-
-interface Game {
-  id: number;
-  name: string;
-  status: "PENDING" | "ACTIVE" | "COMPLETED";
-  players: User[];
-}
+import generateGame from "../utils/generateGame";
+import { Game, ActiveGame } from "../gameTypes";
 
 const games = new Map<number, Game>();
+const activeGames = new Map<number, ActiveGame>();
+
+cron.schedule("*/5 * * * * *", () => {
+  // Simulates a day
+  activeGames.forEach((game, gameId) => {});
+});
 
 const gameSocket = (io: Server) => {
   io.use(async (socket, next) => {
@@ -106,7 +103,9 @@ const gameSocket = (io: Server) => {
           "IN_PROGRESS",
         )) as Game;
         games.set(gameId, updatedGame);
-        io.to(`game_${gameId}`).emit("gameUpdated", updatedGame);
+        const activeGame = generateGame(updatedGame);
+        activeGames.set(gameId, activeGame);
+        io.to(`game_${gameId}`).emit("gameStarted", activeGame);
       } catch (error) {
         console.error("Error starting game:", error);
         socket.emit("error", "An error occurred while starting the game");
