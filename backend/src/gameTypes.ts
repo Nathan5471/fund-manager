@@ -26,7 +26,7 @@ export interface Player extends User {
   cash: number;
   totalValue: number;
   totalValueHistory: Map<number, number>;
-  ownedStocks: string[];
+  ownedStocks: Map<string, number>; // stock name to percent of total investments
   investors: Map<string, number>;
 }
 

@@ -174,6 +174,70 @@ const gameSocket = (io: Server) => {
       }
     });
 
+    socket.on(
+      "changeStockPicks",
+      async (gameId: number, stockPicks: Map<string, number>) => {
+        const game = activeGames.get(gameId);
+        if (!game) {
+          socket.emit("error", "Game not found");
+          return;
+        }
+        const player = game.players.find((player) => player.id === user.id);
+        if (!player) {
+          socket.emit("error", "You are not part of this game");
+          return;
+        }
+        let totalInvestment = 0;
+        for (const [stockName, percent] of stockPicks) {
+          totalInvestment += percent;
+        }
+        if (totalInvestment > 1) {
+          socket.emit("error", "Total investment can't exceed 100%");
+          return;
+        }
+        player.ownedStocks = stockPicks;
+        const totalValue = player.totalValue;
+        let cash = player.totalValue;
+        for (const [stockName, percent] of stockPicks) {
+          const stock = game.stocks.find((s) => s.name === stockName);
+          if (!stock) {
+            socket.emit("error", `Stock ${stockName} not found`);
+            return;
+          }
+          const currentInvestment =
+            stock.owners.get(player.id)?.currentValue || 0;
+          const newInvestment = totalValue * percent;
+          const investmentChange = newInvestment - currentInvestment;
+          const newPrice = stock.price + investmentChange;
+          cash -= newInvestment;
+          stock.owners.set(player.id, {
+            name: player.username,
+            totalInvested: newInvestment,
+            currentValue: newPrice,
+            percentOwned: newInvestment / newPrice,
+          });
+          const investmentImpact = Math.max(
+            -0.1,
+            Math.min(0.1, investmentChange / newPrice),
+          );
+          for (const [ownerId, owner] of stock.owners) {
+            const newOwnerValue = owner.currentValue * (1 + investmentImpact);
+            const change = newOwnerValue - owner.currentValue;
+            owner.currentValue = newOwnerValue;
+            const ownerPlayer = game.players.find((p) => p.id === ownerId);
+            if (ownerPlayer) {
+              ownerPlayer.totalValue += change;
+            }
+            owner.percentOwned = owner.currentValue / stock.price;
+            stock.price += change;
+          }
+          stock.priceHistory.set(game.currentDay, stock.price);
+        }
+        player.cash = cash;
+        io.to(`game_${gameId}`).emit("gameUpdated", game);
+      },
+    );
+
     socket.on("disconnect", async () => {
       console.log(`User ${user.id} disconnected`);
       const userGames = Array.from(games.values()).filter((game) => {

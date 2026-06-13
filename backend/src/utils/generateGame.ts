@@ -18,7 +18,7 @@ const generateGame = (game: Game) => {
       cash: 1000,
       totalValue: 1000,
       totalValueHistory: new Map<number, number>(),
-      ownedStocks: [],
+      ownedStocks: new Map<string, number>(),
       investors: new Map<string, number>(),
     };
     player.totalValueHistory.set(0, player.totalValue);
