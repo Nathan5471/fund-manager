@@ -11,6 +11,7 @@ export interface Stock {
   price: number;
   volatility: number;
   baseChange: number;
+  playerSentiment: number;
   priceHistory: Map<number, number>;
   purchaseHistory: Map<number, number>;
   owners: Map<string, Owner>;

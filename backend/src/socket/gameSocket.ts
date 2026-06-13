@@ -27,6 +27,15 @@ const gameSocket = (io: Server) => {
         }
         io.to(`game_${gameId}`).emit("gameCompleted", game);
       } else {
+        if (Math.random() < 0.6 && game.currentEvents.length > 0) {
+          // 60% chance of ending a random event
+          const eventIndex = Math.floor(
+            Math.random() * game.currentEvents.length,
+          );
+          game.currentEvents = game.currentEvents.filter(
+            (_, index) => index !== eventIndex,
+          );
+        }
         if (Math.random() < 0.05) {
           // 5% chance of a random event
           const events = [
@@ -61,15 +70,21 @@ const gameSocket = (io: Server) => {
             game.marketRate +
             eventImpact +
             stock.volatility * (Math.random() - 0.5) +
-            stock.baseChange;
+            stock.baseChange +
+            stock.playerSentiment;
           stock.price *= stockChange;
           stock.priceHistory.set(game.currentDay, stock.price);
+          stock.playerSentiment *= 0.7;
+          if (Math.abs(stock.playerSentiment) < 0.01) {
+            stock.playerSentiment = 0;
+          }
           for (const [playerId, owner] of stock.owners) {
             const player = game.players.find((p) => p.id === playerId);
             if (player) {
               const stockValue = owner.currentValue * stockChange;
               player.totalValue += stockValue - owner.currentValue;
               owner.currentValue = stockValue;
+              owner.percentOwned = owner.currentValue / stock.price;
             }
           }
         }
@@ -209,29 +224,24 @@ const gameSocket = (io: Server) => {
           const newInvestment = totalValue * percent;
           const investmentChange = newInvestment - currentInvestment;
           const newPrice = stock.price + investmentChange;
+          stock.price = newPrice;
           cash -= newInvestment;
           stock.owners.set(player.id, {
             name: player.username,
             totalInvested: newInvestment,
-            currentValue: newPrice,
+            currentValue: newInvestment,
             percentOwned: newInvestment / newPrice,
           });
-          const investmentImpact = Math.max(
-            -0.1,
-            Math.min(0.1, investmentChange / newPrice),
-          );
-          for (const [ownerId, owner] of stock.owners) {
-            const newOwnerValue = owner.currentValue * (1 + investmentImpact);
-            const change = newOwnerValue - owner.currentValue;
-            owner.currentValue = newOwnerValue;
-            const ownerPlayer = game.players.find((p) => p.id === ownerId);
-            if (ownerPlayer) {
-              ownerPlayer.totalValue += change;
-            }
-            owner.percentOwned = owner.currentValue / stock.price;
-            stock.price += change;
-          }
           stock.priceHistory.set(game.currentDay, stock.price);
+          const impactOnPlayerSentiment = (investmentChange / totalValue) * 0.1;
+          const newPlayerSentiment = Math.max(
+            -0.1,
+            Math.min(0.1, stock.playerSentiment + impactOnPlayerSentiment),
+          );
+          stock.playerSentiment = newPlayerSentiment;
+          for (const [ownerId, owner] of stock.owners) {
+            owner.percentOwned = owner.currentValue / stock.price;
+          }
         }
         player.cash = cash;
         io.to(`game_${gameId}`).emit("gameUpdated", game);

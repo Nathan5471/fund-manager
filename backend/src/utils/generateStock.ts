@@ -19,6 +19,7 @@ const generateStock = (
     price: startingPrice,
     volatility,
     baseChange,
+    playerSentiment: 0,
     priceHistory,
     purchaseHistory,
     owners,
